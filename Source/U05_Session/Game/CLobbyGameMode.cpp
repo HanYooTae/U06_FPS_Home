@@ -14,7 +14,7 @@ void ACLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		CLog::Print("Ready to play");
 
 		FTimerHandle timerHandle;
-		GetWorldTimerManager().SetTimer(timerHandle, this, &ACLobbyGameMode::StartGame, 10);
+		GetWorldTimerManager().SetTimer(timerHandle, this, &ACLobbyGameMode::StartGame, 5);
 	}
 }
 
@@ -35,5 +35,5 @@ void ACLobbyGameMode::StartGame()
 	CheckNull(world);
 
 	bUseSeamlessTravel = true;
-	world->ServerTravel("/Game/Maps/Play?listen");
+	world->ServerTravel("/Game/Maps/FPS?listen");
 }

@@ -15,6 +15,7 @@ class AFP_FirstPersonCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+public:
 	// Components
 	UPROPERTY(VisibleDefaultsOnly, Category=Mesh)
 		USkeletalMeshComponent* FP_Mesh;
@@ -69,5 +70,16 @@ protected:
 public:
 	FORCEINLINE class USkeletalMeshComponent* GetFP_Mesh() const { return FP_Mesh; }
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return Camera; }
+
+// RPC
+private:
+	UFUNCTION(Reliable, Server)
+		void OnServer();
+
+	UFUNCTION(NetMulticast, Reliable)
+		void OnNetMulticast();
+
+	UFUNCTION(Client, Unreliable)
+		void OnClient();
 };
 

@@ -108,6 +108,8 @@ void AFP_FirstPersonCharacter::OnFire()
 	{
 		DamagedComponent->AddImpulseAtLocation(ShootDir * WeaponDamage, Impact.Location);
 	}
+
+	OnServer();
 }
 
 void AFP_FirstPersonCharacter::MoveForward(float Value)
@@ -150,4 +152,21 @@ FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, cons
 	GetWorld()->LineTraceSingleByChannel(Hit, StartTrace, EndTrace, COLLISION_WEAPON, TraceParams);
 
 	return Hit;
+}
+
+void AFP_FirstPersonCharacter::OnServer_Implementation()
+{
+	CLog::Print("Only Server Call");
+	//OnNetMulticast();
+	OnClient();
+}
+
+void AFP_FirstPersonCharacter::OnNetMulticast_Implementation()
+{
+	CLog::Print("Multicast Call");
+}
+
+void AFP_FirstPersonCharacter::OnClient_Implementation()
+{
+	CLog::Print("Client Call");
 }
