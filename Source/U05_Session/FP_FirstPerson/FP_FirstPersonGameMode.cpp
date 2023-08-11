@@ -1,16 +1,18 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "FP_FirstPersonGameMode.h"
 #include "FP_FirstPersonHUD.h"
 #include "FP_FirstPersonCharacter.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Game/CGameStateBase.h"
 
 AFP_FirstPersonGameMode::AFP_FirstPersonGameMode()
 {
-	// Set default pawn class to our Blueprinted character
+	// Default Pawn Class
 	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnClassFinder(TEXT("/Game/FirstPersonCPP/Blueprints/FirstPersonCharacter"));
 	DefaultPawnClass = PlayerPawnClassFinder.Class;
 
-	// Use our custom HUD class
+	// HUD Class
 	HUDClass = AFP_FirstPersonHUD::StaticClass();
+
+	// GameState Class
+	GameStateClass = ACGameStateBase::StaticClass();
 }

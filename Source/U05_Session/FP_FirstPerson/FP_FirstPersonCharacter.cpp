@@ -8,6 +8,8 @@
 #include "Global.h"
 #include "Net/UnrealNetwork.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "CBullet.h"
+#include "Game/CGameStateBase.h"
 
 #define COLLISION_WEAPON		ECC_GameTraceChannel1
 
@@ -43,15 +45,21 @@ AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 	TP_Gun->SetupAttachment(GetMesh(), TEXT("hand_rSocket"));
 	TP_Gun->SetOwnerNoSee(true);
 
-	CHelpers::CreateSceneComponent(this, &FP_GunshotParticle, "FP_GunshotParticle");
+	CHelpers::CreateSceneComponent(this, &FP_GunshotParticle, "FP_GunshotParticle", FP_Gun);
 	FP_GunshotParticle->SetupAttachment(FP_Gun, "Muzzle");
 	FP_GunshotParticle->SetOnlyOwnerSee(true);
 	FP_GunshotParticle->bAutoActivate = false;
 
-	CHelpers::CreateSceneComponent(this, &TP_GunshotParticle, "TP_GunshotParticle");
+	CHelpers::CreateSceneComponent(this, &TP_GunshotParticle, "TP_GunshotParticle", TP_Gun);
 	TP_GunshotParticle->SetupAttachment(TP_Gun, "Muzzle");
 	TP_GunshotParticle->SetOwnerNoSee(true);
 	TP_GunshotParticle->bAutoActivate = false;
+}
+
+void AFP_FirstPersonCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	
 }
 
 void AFP_FirstPersonCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -144,6 +152,16 @@ void AFP_FirstPersonCharacter::FireEffect_Implementation()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
 	}
+
+	// Play TP_Gunshot Particle
+	if (!!TP_GunshotParticle)
+		TP_GunshotParticle->Activate(true);
+
+	// Spawn Bullet
+	UWorld* world = GetWorld();
+	CheckNull(world);
+	if (!!world)
+		world->SpawnActor<ACBullet>(ACBullet::StaticClass(), FP_Gun->GetSocketLocation("Muzzle"), FP_Gun->GetSocketRotation("Muzzle"));
 }
 
 void AFP_FirstPersonCharacter::MoveForward(float Value)
