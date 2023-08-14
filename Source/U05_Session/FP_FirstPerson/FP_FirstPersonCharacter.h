@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Game/CGameStateBase.h"
 #include "FP_FirstPersonCharacter.generated.h"
 
 class UInputComponent;
@@ -64,6 +65,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 		float WeaponDamage;
 
+	UPROPERTY(Replicated)
+		ETeamType CurrentTeam;
+
 protected:
 	void OnFire();
 
@@ -75,6 +79,12 @@ protected:
 		void FireEffect();
 		void FireEffect_Implementation();
 
+public:
+	UFUNCTION(NetMulticast, Reliable)
+		void SetTeamColor(ETeamType InTeamType);
+		void SetTeamColor_Implementation(ETeamType InTeamType);
+
+protected:
 	void MoveForward(float Val);
 	void MoveRight(float Val);
 
@@ -89,6 +99,6 @@ public:
 	FORCEINLINE class USkeletalMeshComponent* GetFP_Mesh() const { return FP_Mesh; }
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return Camera; }
 
-
+private:
+	class UMaterialInstanceDynamic* DynamicMaterial;
 };
-
