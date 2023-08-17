@@ -7,7 +7,6 @@ ACSpawnPoint::ACSpawnPoint()
 	PrimaryActorTick.bCanEverTick = true;
 
 	CHelpers::CreateSceneComponent(this, &Capsule, "Capsule");
-	
 }
 
 void ACSpawnPoint::OnConstruction(const FTransform& Transform)
@@ -18,17 +17,42 @@ void ACSpawnPoint::OnConstruction(const FTransform& Transform)
 		Capsule->ShapeColor = FColor(255, 0, 0);
 	else
 		Capsule->ShapeColor = FColor(0, 0, 255);
+
+	Capsule->SetHiddenInGame(bHiddenInGame);
 }
 
 void ACSpawnPoint::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	OnActorBeginOverlap.AddDynamic(this, &ACSpawnPoint::BeginOverlap);
+	OnActorEndOverlap.AddDynamic(this, &ACSpawnPoint::EndOverlap);
 }
 
 void ACSpawnPoint::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	Capsule->UpdateOverlaps();
+}
+
+void ACSpawnPoint::BeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
+{
+	if (HasAuthority() == true)
+	{
+		// == AddUnique
+		if (OverlappingActors.Find(OtherActor) < 0)
+			OverlappingActors.Add(OtherActor);
+	}
+}
+
+void ACSpawnPoint::EndOverlap(AActor* OverlappedActor, AActor* OtherActor)
+{
+	if (HasAuthority() == true)
+	{
+		// == AddUnique
+		if (OverlappingActors.Find(OtherActor) >= 0)
+			OverlappingActors.Remove(OtherActor);
+	}
 }
 

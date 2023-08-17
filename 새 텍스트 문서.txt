@@ -1,0 +1,5 @@
+** 감속, 배속 효과 구현 **
+
+1. actorcomponent로 구현
+2. Player 및 Enemy한테 붙이기
+3. Weapon Class 구현 후, 특정 Weapon으로 타격 시, 감속 또는 배속 효과 적용

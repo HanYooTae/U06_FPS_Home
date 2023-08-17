@@ -10,6 +10,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "CBullet.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Game/CPlayerState.h"
 
 #define COLLISION_WEAPON		ECC_GameTraceChannel1
 
@@ -38,7 +39,7 @@ AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 	FP_Gun->SetupAttachment(FP_Mesh, TEXT("GripPoint"));
 
 	WeaponRange = 5000.0f;
-	WeaponDamage = 500000.0f;
+	WeaponDamage = 10.0f;
 
 	GetMesh()->SetOwnerNoSee(true);
 	CHelpers::CreateSceneComponent(this, &TP_Gun, "TP_Gun", GetMesh());
@@ -54,6 +55,25 @@ AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 	TP_GunshotParticle->SetupAttachment(TP_Gun, "Muzzle");
 	TP_GunshotParticle->SetOwnerNoSee(true);
 	TP_GunshotParticle->bAutoActivate = false;
+}
+
+ACPlayerState* AFP_FirstPersonCharacter::GetSelfPlayerState()
+{
+	if (SelfPlayerState == nullptr)
+		SelfPlayerState = Cast<ACPlayerState>(GetPlayerState());
+
+	return SelfPlayerState;
+}
+
+void AFP_FirstPersonCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	//NewController->PlayerState;
+	SelfPlayerState = Cast<ACPlayerState>(GetPlayerState());
+
+	if(HasAuthority() && !!SelfPlayerState)
+		SelfPlayerState->Health = 100.f;
 }
 
 void AFP_FirstPersonCharacter::BeginPlay()
@@ -119,17 +139,7 @@ void AFP_FirstPersonCharacter::OnFire()
 	const FVector EndTrace = StartTrace + ShootDir * WeaponRange;
 
 	// Check for impact
-	const FHitResult Impact = WeaponTrace(StartTrace, EndTrace);
-
-	// Deal with impact
-	AActor* DamagedActor = Impact.GetActor();
-	UPrimitiveComponent* DamagedComponent = Impact.GetComponent();
-
-	// If we hit an actor, with a component that is simulating physics, apply an impulse
-	if ((DamagedActor != NULL) && (DamagedActor != this) && (DamagedComponent != NULL) && DamagedComponent->IsSimulatingPhysics())
-	{
-		DamagedComponent->AddImpulseAtLocation(ShootDir * WeaponDamage, Impact.Location);
-	}
+	//const FHitResult Impact = WeaponTrace(StartTrace, EndTrace);
 
 	OnFire_Server(StartTrace, EndTrace);
 
@@ -137,6 +147,7 @@ void AFP_FirstPersonCharacter::OnFire()
 
 void AFP_FirstPersonCharacter::OnFire_Server_Implementation(const FVector& LineStart, const FVector& LineEnd)
 {
+	WeaponTrace(LineStart, LineEnd);
 	FireEffect();
 }
 
@@ -164,6 +175,21 @@ void AFP_FirstPersonCharacter::FireEffect_Implementation()
 	CheckNull(world);
 	if (!!world)
 		world->SpawnActor<ACBullet>(ACBullet::StaticClass(), FP_Gun->GetSocketLocation("Muzzle"), FP_Gun->GetSocketRotation("Muzzle"));
+}
+
+void AFP_FirstPersonCharacter::PlayDead_Implementation()
+{
+	GetMesh()->SetCollisionProfileName("Ragdoll");
+	GetMesh()->SetPhysicsBlendWeight(0);	// 1에 가까울수록 물리엔진이 100% 적용됨
+	GetMesh()->SetSimulatePhysics(true);
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void AFP_FirstPersonCharacter::PlayHit_Implementation()
+{
+	UAnimInstance* animInstance = GetMesh()->GetAnimInstance();
+	if (!!animInstance)
+		animInstance->Montage_Play(TP_HitAnimation, 1.5f);
 }
 
 void AFP_FirstPersonCharacter::SetTeamColor_Implementation(ETeamType InTeamType)
@@ -216,7 +242,7 @@ void AFP_FirstPersonCharacter::LookUpAtRate(float Rate)
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
-FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace) const
+FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace)
 {
 	// Perform trace to retrieve hit info
 	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(WeaponTrace), true, GetInstigator());
@@ -225,7 +251,47 @@ FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, cons
 	FHitResult Hit(ForceInit);
 	GetWorld()->LineTraceSingleByChannel(Hit, StartTrace, EndTrace, COLLISION_WEAPON, TraceParams);
 
+	CheckFalseResult(Hit.bBlockingHit, Hit);
+
+	// Apply Damage
+	AFP_FirstPersonCharacter* other = Cast<AFP_FirstPersonCharacter>(Hit.GetActor());
+	if (!!other)
+	{
+		FDamageEvent damageEvent;
+		other->TakeDamage(WeaponDamage, damageEvent, GetController(), this);
+	}
+
 	return Hit;
+}
+
+// Any Damage
+float AFP_FirstPersonCharacter::TakeDamage(float Damage, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
+
+	CheckTrueResult(DamageCauser == this, Damage);
+
+	SelfPlayerState->Health -= Damage;
+
+	// 사망
+	if (SelfPlayerState->Health <= 0)
+	{
+		PlayDead();
+
+		SelfPlayerState->Death++;
+
+		AFP_FirstPersonCharacter* causer = Cast<AFP_FirstPersonCharacter>(DamageCauser);
+		if (!!causer)
+			causer->SelfPlayerState->Score++;
+
+		return Damage;
+	}
+
+	// 히트
+	PlayHit();
+
+
+	return Damage;
 }
 
 void AFP_FirstPersonCharacter::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
