@@ -39,7 +39,8 @@ void AFP_FirstPersonGameMode::PostLogin(APlayerController* NewPlayer)
 	AFP_FirstPersonCharacter* playerPawn = Cast<AFP_FirstPersonCharacter>(NewPlayer->GetPawn());
 	CheckNull(playerPawn);
 
-	playerPawn->SetPlayerState(playerState);
+	// Player PossessedBy의 내용과 중복됨
+	//playerPawn->SetPlayerState(playerState);
 
 	// 팀 분배
 	if (RedTeamPlayers.Num() > BlueTeamPlayers.Num())
@@ -85,6 +86,13 @@ void AFP_FirstPersonGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if (WaitingPlayers.Num() > 0)
+	{
+		for (const auto& player : WaitingPlayers)
+		{
+			MoveToSpawnPoint(player);
+		}
+	}
 }
 
 void AFP_FirstPersonGameMode::SpawnHost(UWorld* world)
@@ -140,10 +148,36 @@ void AFP_FirstPersonGameMode::MoveToSpawnPoint(AFP_FirstPersonCharacter* InPlaye
 			InPlayer->SetActorLocation(target->GetActorLocation());
 			target->UpdateOverlaps();
 
+			if (WaitingPlayers.Find(InPlayer) >= 0)
+				WaitingPlayers.RemoveSingle(InPlayer);
+
 			return;
 		}
 	}
 	// 스폰 포인트가 블락되어 있는 경우
 	if (WaitingPlayers.Find(InPlayer) < 0)
 		WaitingPlayers.Add(InPlayer);
+}
+
+void AFP_FirstPersonGameMode::Respawn(AFP_FirstPersonCharacter* InPlayer)
+{
+	// 컨트롤러 끊기
+	AController* controller = InPlayer->GetController();
+	InPlayer->DetachFromControllerPendingDestroy();
+
+	// 다시 스폰
+	AFP_FirstPersonCharacter* player = Cast<AFP_FirstPersonCharacter>(GetWorld()->SpawnActor(DefaultPawnClass));
+	CheckNull(player);
+
+	// 다시 빙의
+	controller->Possess(player);
+
+	// 기존의 팀정보 유지
+	//player->GetSelfPlayerState();
+	ACPlayerState* playerState = Cast<ACPlayerState>(controller->PlayerState);
+	player->CurrentTeam = playerState->Team;
+	player->SetTeamColor(playerState->Team);
+
+	// 스폰 포인트로 이동
+	MoveToSpawnPoint(player);
 }

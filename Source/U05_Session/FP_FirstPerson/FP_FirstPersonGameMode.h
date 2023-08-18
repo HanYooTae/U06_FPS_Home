@@ -15,13 +15,13 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Tick(float DeltaSeconds) override;
 
-	void SpawnHost(UWorld* world);
-
 protected:
 	virtual void BeginPlay() override;
 
 public:
+	void SpawnHost(UWorld* world);
 	void MoveToSpawnPoint(class AFP_FirstPersonCharacter* InPlayer);
+	void Respawn(class AFP_FirstPersonCharacter* InPlayer);
 
 private:
 	TArray<class AFP_FirstPersonCharacter*> RedTeamPlayers;

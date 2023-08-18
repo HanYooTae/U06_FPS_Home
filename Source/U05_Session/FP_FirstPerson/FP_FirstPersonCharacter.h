@@ -114,6 +114,11 @@ public:
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return Camera; }
 
 private:
+	UFUNCTION()
+		void Respawn();
+
+private:
 	class UMaterialInstanceDynamic* DynamicMaterial;
 	class ACPlayerState* SelfPlayerState;
+	TArray<class AActor*> IgnoreActors;
 };

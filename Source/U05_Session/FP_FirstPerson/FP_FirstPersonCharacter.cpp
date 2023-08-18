@@ -11,6 +11,8 @@
 #include "CBullet.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Game/CPlayerState.h"
+#include "Game/CSpawnPoint.h"
+#include "FP_FirstPersonGameMode.h"
 
 #define COLLISION_WEAPON		ECC_GameTraceChannel1
 
@@ -82,6 +84,8 @@ void AFP_FirstPersonCharacter::BeginPlay()
 	
 	if(HasAuthority() == false)
 		SetTeamColor(CurrentTeam);
+
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACSpawnPoint::StaticClass(), IgnoreActors);
 }
 
 void AFP_FirstPersonCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -102,8 +106,21 @@ void AFP_FirstPersonCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AFP_FirstPersonCharacter::LookUpAtRate);
 }
 
+void AFP_FirstPersonCharacter::Respawn()
+{
+	CheckFalse(HasAuthority());
+
+	AFP_FirstPersonGameMode* gameMode = Cast<AFP_FirstPersonGameMode>(GetWorld()->GetAuthGameMode());
+	CheckNull(gameMode);
+
+	gameMode->Respawn(this);
+	Destroy(true);
+}
+
 void AFP_FirstPersonCharacter::OnFire()
 {
+	CheckTrue(SelfPlayerState->Health <= 0);
+
 	if (FireAnimation != NULL)
 	{
 		UAnimInstance* AnimInstance = FP_Mesh->GetAnimInstance();
@@ -180,9 +197,13 @@ void AFP_FirstPersonCharacter::FireEffect_Implementation()
 void AFP_FirstPersonCharacter::PlayDead_Implementation()
 {
 	GetMesh()->SetCollisionProfileName("Ragdoll");
-	GetMesh()->SetPhysicsBlendWeight(0);	// 1에 가까울수록 물리엔진이 100% 적용됨
+	GetMesh()->SetPhysicsBlendWeight(1);	// 1에 가까울수록 물리엔진이 100% 적용됨
 	GetMesh()->SetSimulatePhysics(true);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	FP_Mesh->SetCollisionProfileName("Ragdoll");
+	FP_Mesh->SetPhysicsBlendWeight(1);	// 1에 가까울수록 물리엔진이 100% 적용됨
+	FP_Mesh->SetSimulatePhysics(true);
 }
 
 void AFP_FirstPersonCharacter::PlayHit_Implementation()
@@ -247,6 +268,7 @@ FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, cons
 	// Perform trace to retrieve hit info
 	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(WeaponTrace), true, GetInstigator());
 	TraceParams.bReturnPhysicalMaterial = true;
+	TraceParams.AddIgnoredActors(IgnoreActors);
 
 	FHitResult Hit(ForceInit);
 	GetWorld()->LineTraceSingleByChannel(Hit, StartTrace, EndTrace, COLLISION_WEAPON, TraceParams);
@@ -255,7 +277,9 @@ FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, cons
 
 	// Apply Damage
 	AFP_FirstPersonCharacter* other = Cast<AFP_FirstPersonCharacter>(Hit.GetActor());
-	if (!!other)
+	if (other
+		&& other->SelfPlayerState->Team != SelfPlayerState->Team &&
+		other->SelfPlayerState->Health > 0)
 	{
 		FDamageEvent damageEvent;
 		other->TakeDamage(WeaponDamage, damageEvent, GetController(), this);
@@ -283,6 +307,15 @@ float AFP_FirstPersonCharacter::TakeDamage(float Damage, FDamageEvent const& Dam
 		AFP_FirstPersonCharacter* causer = Cast<AFP_FirstPersonCharacter>(DamageCauser);
 		if (!!causer)
 			causer->SelfPlayerState->Score++;
+
+		FTimerHandle handle;
+		GetWorldTimerManager().SetTimer
+		(
+			handle,
+			this,
+			&AFP_FirstPersonCharacter::Respawn,
+			3.f
+		);
 
 		return Damage;
 	}
